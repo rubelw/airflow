@@ -1,0 +1,74 @@
+ARG PYTHON_BASE_IMAGE="ubuntu:20.04"
+
+FROM ${PYTHON_BASE_IMAGE}
+
+
+ARG TARGETARCH
+
+LABEL org.opencontainers.image.authors="https://bitnami.com/contact" \
+      org.opencontainers.image.description="Application packaged by Bitnami" \
+      org.opencontainers.image.ref.name="1.17.0-debian-11-r47" \
+      org.opencontainers.image.source="https://github.com/bitnami/containers/tree/main/bitnami/pgbouncer" \
+      org.opencontainers.image.title="pgbouncer" \
+      org.opencontainers.image.vendor="VMware, Inc." \
+      org.opencontainers.image.version="1.17.0"
+
+ENV HOME="/" \
+    OS_ARCH="${TARGETARCH:-amd64}" \
+    OS_FLAVOUR="debian-11" \
+    OS_NAME="linux"
+
+COPY prebuildfs /
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+COPY ./files/libhogweed6_3.7-2.1ubuntu1.1_amd64.deb /
+COPY ./files/libnettle8_3.7-2.1ubuntu1_amd64.deb /
+COPY ./files/libicu67_67.1-7_amd64.deb /
+RUN dpkg -i /libicu67_67.1-7_amd64.deb
+RUN dpkg -i /libnettle8_3.7-2.1ubuntu1_amd64.deb
+RUN dpkg -i /libhogweed6_3.7-2.1ubuntu1.1_amd64.deb
+
+# Install required system packages and dependencies
+RUN install_packages ca-certificates curl libaudit1 libbsd0 libc-ares2 libcap-ng0 libedit2 libevent-2.1-7 libffi7 libgcc-s1 libgmp10 libgnutls30 libhogweed6 libicu67 libidn2-0 libldap-2.4-2 liblzma5 libmd0 libnettle8 libp11-kit0 libpam0g libsasl2-2 libssl1.1 libstdc++6 libtasn1-6 libtinfo6 libunistring2 libuuid1 libxml2 libxslt1.1 locales procps zlib1g
+RUN mkdir -p /tmp/bitnami/pkg/cache/ && cd /tmp/bitnami/pkg/cache/ && \
+    COMPONENTS=( \
+      "wait-for-port-1.0.3-155-linux-${OS_ARCH}-debian-11" \
+      "postgresql-client-14.5.0-2-linux-${OS_ARCH}-debian-11" \
+      "ini-file-1.4.3-154-linux-${OS_ARCH}-debian-11" \
+      "gosu-1.14.0-155-linux-${OS_ARCH}-debian-11" \
+      "pgbouncer-1.17.0-156-linux-${OS_ARCH}-debian-11" \
+    ) && \
+    for COMPONENT in "${COMPONENTS[@]}"; do \
+      if [ ! -f "${COMPONENT}.tar.gz" ]; then \
+        curl -SsLf "https://downloads.bitnami.com/files/stacksmith/${COMPONENT}.tar.gz" -O ; \
+        curl -SsLf "https://downloads.bitnami.com/files/stacksmith/${COMPONENT}.tar.gz.sha256" -O ; \
+      fi && \
+      sha256sum -c "${COMPONENT}.tar.gz.sha256" && \
+      tar -zxf "${COMPONENT}.tar.gz" -C /opt/bitnami --strip-components=2 --no-same-owner --wildcards '*/files' && \
+      rm -rf "${COMPONENT}.tar.gz{,sha256}" ; \
+    done
+RUN apt-get autoremove --purge -y curl && \
+    apt-get update && apt-get upgrade -y && \
+    apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
+RUN chmod g+rwX /opt/bitnami
+RUN localedef -c -f UTF-8 -i en_US en_US.UTF-8
+RUN update-locale LANG=C.UTF-8 LC_MESSAGES=POSIX && \
+    DEBIAN_FRONTEND=noninteractive dpkg-reconfigure locales
+RUN echo 'en_GB.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen
+RUN echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen && locale-gen
+
+COPY rootfs /
+RUN /opt/bitnami/scripts/locales/add-extra-locales.sh
+RUN /opt/bitnami/scripts/pgbouncer/postunpack.sh
+ENV APP_VERSION="1.17.0" \
+    BITNAMI_APP_NAME="pgbouncer" \
+    LANG="en_US.UTF-8" \
+    LANGUAGE="en_US:en" \
+    NSS_WRAPPER_LIB="/opt/bitnami/common/lib/libnss_wrapper.so" \
+    PATH="/opt/bitnami/common/bin:/opt/bitnami/postgresql/bin:/opt/bitnami/pgbouncer/bin:$PATH"
+
+EXPOSE 6432
+
+USER 1001
+ENTRYPOINT [ "/opt/bitnami/scripts/pgbouncer/entrypoint.sh" ]
+CMD [ "/opt/bitnami/scripts/pgbouncer/run.sh" ]
