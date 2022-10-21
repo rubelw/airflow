@@ -367,3 +367,1224 @@ Return the path to the CA cert file.
     {{ required "A secret containing TLS certificates is required when TLS is enabled" .Values.tls.certificatesSecret }}
 {{- end -}}
 {{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+
+{{/*
+Return the target Kubernetes version
+*/}}
+{{- define "common.capabilities.kubeVersion" -}}
+{{- if .Values.global }}
+    {{- if .Values.global.kubeVersion }}
+    {{- .Values.global.kubeVersion -}}
+    {{- else }}
+    {{- default .Capabilities.KubeVersion.Version .Values.kubeVersion -}}
+    {{- end -}}
+{{- else }}
+{{- default .Capabilities.KubeVersion.Version .Values.kubeVersion -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for policy.
+*/}}
+{{- define "common.capabilities.policy.apiVersion" -}}
+{{- if semverCompare "<1.21-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "policy/v1beta1" -}}
+{{- else -}}
+{{- print "policy/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for deployment.
+*/}}
+{{- define "common.capabilities.deployment.apiVersion" -}}
+{{- if semverCompare "<1.14-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "extensions/v1beta1" -}}
+{{- else -}}
+{{- print "apps/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for statefulset.
+*/}}
+{{- define "common.capabilities.statefulset.apiVersion" -}}
+{{- if semverCompare "<1.14-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "apps/v1beta1" -}}
+{{- else -}}
+{{- print "apps/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for ingress.
+*/}}
+{{- define "common.capabilities.ingress.apiVersion" -}}
+{{- if .Values.ingress -}}
+{{- if .Values.ingress.apiVersion -}}
+{{- .Values.ingress.apiVersion -}}
+{{- else if semverCompare "<1.14-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "extensions/v1beta1" -}}
+{{- else if semverCompare "<1.19-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "networking.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "networking.k8s.io/v1" -}}
+{{- end }}
+{{- else if semverCompare "<1.14-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "extensions/v1beta1" -}}
+{{- else if semverCompare "<1.19-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "networking.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "networking.k8s.io/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for RBAC resources.
+*/}}
+{{- define "common.capabilities.rbac.apiVersion" -}}
+{{- if semverCompare "<1.17-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "rbac.authorization.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "rbac.authorization.k8s.io/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for CRDs.
+*/}}
+{{- define "common.capabilities.crd.apiVersion" -}}
+{{- if semverCompare "<1.19-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "apiextensions.k8s.io/v1beta1" -}}
+{{- else -}}
+{{- print "apiextensions.k8s.io/v1" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns true if the used Helm version is 3.3+.
+A way to check the used Helm version was not introduced until version 3.3.0 with .Capabilities.HelmVersion, which contains an additional "{}}"  structure.
+This check is introduced as a regexMatch instead of {{ if .Capabilities.HelmVersion }} because checking for the key HelmVersion in <3.3 results in a "interface not found" error.
+**To be removed when the catalog's minimun Helm version is 3.3**
+*/}}
+{{- define "common.capabilities.supportsHelmVersion" -}}
+{{- if regexMatch "{(v[0-9])*[^}]*}}$" (.Capabilities | toString ) }}
+  {{- true -}}
+{{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Through error when upgrading using empty passwords values that must not be empty.
+
+Usage:
+{{- $validationError00 := include "common.validations.values.single.empty" (dict "valueKey" "path.to.password00" "secret" "secretName" "field" "password-00") -}}
+{{- $validationError01 := include "common.validations.values.single.empty" (dict "valueKey" "path.to.password01" "secret" "secretName" "field" "password-01") -}}
+{{ include "common.errors.upgrade.passwords.empty" (dict "validationErrors" (list $validationError00 $validationError01) "context" $) }}
+
+Required password params:
+  - validationErrors - String - Required. List of validation strings to be return, if it is empty it won't throw error.
+  - context - Context - Required. Parent context.
+*/}}
+{{- define "common.errors.upgrade.passwords.empty" -}}
+  {{- $validationErrors := join "" .validationErrors -}}
+  {{- if and $validationErrors .context.Release.IsUpgrade -}}
+    {{- $errorString := "\nPASSWORDS ERROR: You must provide your current passwords when upgrading the release." -}}
+    {{- $errorString = print $errorString "\n                 Note that even after reinstallation, old credentials may be needed as they may be kept in persistent volume claims." -}}
+    {{- $errorString = print $errorString "\n                 Further information can be obtained at https://docs.bitnami.com/general/how-to/troubleshoot-helm-chart-issues/#credential-errors-while-upgrading-chart-releases" -}}
+    {{- $errorString = print $errorString "\n%s" -}}
+    {{- printf $errorString $validationErrors | fail -}}
+  {{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Return the proper image name
+{{ include "common.images.image" ( dict "imageRoot" .Values.path.to.the.image "global" $) }}
+*/}}
+{{- define "common.images.image" -}}
+{{- $registryName := .imageRoot.registry -}}
+{{- $repositoryName := .imageRoot.repository -}}
+{{- $tag := .imageRoot.tag | toString -}}
+{{- if .global }}
+    {{- if .global.imageRegistry }}
+     {{- $registryName = .global.imageRegistry -}}
+    {{- end -}}
+{{- end -}}
+{{- if $registryName }}
+{{- printf "%s/%s:%s" $registryName $repositoryName $tag -}}
+{{- else -}}
+{{- printf "%s:%s" $repositoryName $tag -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the proper Docker Image Registry Secret Names (deprecated: use common.images.renderPullSecrets instead)
+{{ include "common.images.pullSecrets" ( dict "images" (list .Values.path.to.the.image1, .Values.path.to.the.image2) "global" .Values.global) }}
+*/}}
+{{- define "common.images.pullSecrets" -}}
+  {{- $pullSecrets := list }}
+
+  {{- if .global }}
+    {{- range .global.imagePullSecrets -}}
+      {{- $pullSecrets = append $pullSecrets . -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- range .images -}}
+    {{- range .pullSecrets -}}
+      {{- $pullSecrets = append $pullSecrets . -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if (not (empty $pullSecrets)) }}
+imagePullSecrets:
+    {{- range $pullSecrets }}
+  - name: {{ . }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
+{{/*
+Return the proper Docker Image Registry Secret Names evaluating values as templates
+{{ include "common.images.renderPullSecrets" ( dict "images" (list .Values.path.to.the.image1, .Values.path.to.the.image2) "context" $) }}
+*/}}
+{{- define "common.images.renderPullSecrets" -}}
+  {{- $pullSecrets := list }}
+  {{- $context := .context }}
+
+  {{- if $context.Values.global }}
+    {{- range $context.Values.global.imagePullSecrets -}}
+      {{- $pullSecrets = append $pullSecrets (include "common.tplvalues.render" (dict "value" . "context" $context)) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- range .images -}}
+    {{- range .pullSecrets -}}
+      {{- $pullSecrets = append $pullSecrets (include "common.tplvalues.render" (dict "value" . "context" $context)) -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- if (not (empty $pullSecrets)) }}
+imagePullSecrets:
+    {{- range $pullSecrets }}
+  - name: {{ . }}
+    {{- end }}
+  {{- end }}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+
+{{/*
+Generate backend entry that is compatible with all Kubernetes API versions.
+
+Usage:
+{{ include "common.ingress.backend" (dict "serviceName" "backendName" "servicePort" "backendPort" "context" $) }}
+
+Params:
+  - serviceName - String. Name of an existing service backend
+  - servicePort - String/Int. Port name (or number) of the service. It will be translated to different yaml depending if it is a string or an integer.
+  - context - Dict - Required. The context for the template evaluation.
+*/}}
+{{- define "common.ingress.backend" -}}
+{{- $apiVersion := (include "common.capabilities.ingress.apiVersion" .context) -}}
+{{- if or (eq $apiVersion "extensions/v1beta1") (eq $apiVersion "networking.k8s.io/v1beta1") -}}
+serviceName: {{ .serviceName }}
+servicePort: {{ .servicePort }}
+{{- else -}}
+service:
+  name: {{ .serviceName }}
+  port:
+    {{- if typeIs "string" .servicePort }}
+    name: {{ .servicePort }}
+    {{- else if or (typeIs "int" .servicePort) (typeIs "float64" .servicePort) }}
+    number: {{ .servicePort | int }}
+    {{- end }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Print "true" if the API pathType field is supported
+Usage:
+{{ include "common.ingress.supportsPathType" . }}
+*/}}
+{{- define "common.ingress.supportsPathType" -}}
+{{- if (semverCompare "<1.18-0" (include "common.capabilities.kubeVersion" .)) -}}
+{{- print "false" -}}
+{{- else -}}
+{{- print "true" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Returns true if the ingressClassname field is supported
+Usage:
+{{ include "common.ingress.supportsIngressClassname" . }}
+*/}}
+{{- define "common.ingress.supportsIngressClassname" -}}
+{{- if semverCompare "<1.18-0" (include "common.capabilities.kubeVersion" .) -}}
+{{- print "false" -}}
+{{- else -}}
+{{- print "true" -}}
+{{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Kubernetes standard labels
+*/}}
+{{- define "common.labels.standard" -}}
+app.kubernetes.io/name: {{ include "common.names.name" . }}
+helm.sh/chart: {{ include "common.names.chart" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}
+
+{{/*
+Labels to use on deploy.spec.selector.matchLabels and svc.spec.selector
+*/}}
+{{- define "common.labels.matchLabels" -}}
+app.kubernetes.io/name: {{ include "common.names.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Expand the name of the chart.
+*/}}
+{{- define "common.names.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "common.names.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define "common.names.fullname" -}}
+{{- if .Values.fullnameOverride -}}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Generate secret name.
+
+Usage:
+{{ include "common.secrets.name" (dict "existingSecret" .Values.path.to.the.existingSecret "defaultNameSuffix" "mySuffix" "context" $) }}
+
+Params:
+  - existingSecret - ExistingSecret/String - Optional. The path to the existing secrets in the values.yaml given by the user
+    to be used instead of the default one. Allows for it to be of type String (just the secret name) for backwards compatibility.
+    +info: https://github.com/bitnami/charts/tree/master/bitnami/common#existingsecret
+  - defaultNameSuffix - String - Optional. It is used only if we have several secrets in the same deployment.
+  - context - Dict - Required. The context for the template evaluation.
+*/}}
+{{- define "common.secrets.name" -}}
+{{- $name := (include "common.names.fullname" .context) -}}
+
+{{- if .defaultNameSuffix -}}
+{{- $name = printf "%s-%s" $name .defaultNameSuffix | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- with .existingSecret -}}
+{{- if not (typeIs "string" .) -}}
+{{- with .name -}}
+{{- $name = . -}}
+{{- end -}}
+{{- else -}}
+{{- $name = . -}}
+{{- end -}}
+{{- end -}}
+
+{{- printf "%s" $name -}}
+{{- end -}}
+
+{{/*
+Generate secret key.
+
+Usage:
+{{ include "common.secrets.key" (dict "existingSecret" .Values.path.to.the.existingSecret "key" "keyName") }}
+
+Params:
+  - existingSecret - ExistingSecret/String - Optional. The path to the existing secrets in the values.yaml given by the user
+    to be used instead of the default one. Allows for it to be of type String (just the secret name) for backwards compatibility.
+    +info: https://github.com/bitnami/charts/tree/master/bitnami/common#existingsecret
+  - key - String - Required. Name of the key in the secret.
+*/}}
+{{- define "common.secrets.key" -}}
+{{- $key := .key -}}
+
+{{- if .existingSecret -}}
+  {{- if not (typeIs "string" .existingSecret) -}}
+    {{- if .existingSecret.keyMapping -}}
+      {{- $key = index .existingSecret.keyMapping $.key -}}
+    {{- end -}}
+  {{- end }}
+{{- end -}}
+
+{{- printf "%s" $key -}}
+{{- end -}}
+
+{{/*
+Generate secret password or retrieve one if already created.
+
+Usage:
+{{ include "common.secrets.passwords.manage" (dict "secret" "secret-name" "key" "keyName" "providedValues" (list "path.to.password1" "path.to.password2") "length" 10 "strong" false "chartName" "chartName" "context" $) }}
+
+Params:
+  - secret - String - Required - Name of the 'Secret' resource where the password is stored.
+  - key - String - Required - Name of the key in the secret.
+  - providedValues - List<String> - Required - The path to the validating value in the values.yaml, e.g: "mysql.password". Will pick first parameter with a defined value.
+  - length - int - Optional - Length of the generated random password.
+  - strong - Boolean - Optional - Whether to add symbols to the generated random password.
+  - chartName - String - Optional - Name of the chart used when said chart is deployed as a subchart.
+  - context - Context - Required - Parent context.
+*/}}
+{{- define "common.secrets.passwords.manage" -}}
+
+{{- $password := "" }}
+{{- $subchart := "" }}
+{{- $chartName := default "" .chartName }}
+{{- $passwordLength := default 10 .length }}
+{{- $providedPasswordKey := include "common.utils.getKeyFromList" (dict "keys" .providedValues "context" $.context) }}
+{{- $providedPasswordValue := include "common.utils.getValueFromKey" (dict "key" $providedPasswordKey "context" $.context) }}
+{{- $secret := (lookup "v1" "Secret" $.context.Release.Namespace .secret) }}
+{{- if $secret }}
+  {{- if index $secret.data .key }}
+  {{- $password = index $secret.data .key }}
+  {{- end -}}
+{{- else if $providedPasswordValue }}
+  {{- $password = $providedPasswordValue | toString | b64enc | quote }}
+{{- else }}
+
+  {{- if .context.Values.enabled }}
+    {{- $subchart = $chartName }}
+  {{- end -}}
+
+  {{- $requiredPassword := dict "valueKey" $providedPasswordKey "secret" .secret "field" .key "subchart" $subchart "context" $.context -}}
+  {{- $requiredPasswordError := include "common.validations.values.single.empty" $requiredPassword -}}
+  {{- $passwordValidationErrors := list $requiredPasswordError -}}
+  {{- include "common.errors.upgrade.passwords.empty" (dict "validationErrors" $passwordValidationErrors "context" $.context) -}}
+
+  {{- if .strong }}
+    {{- $subStr := list (lower (randAlpha 1)) (randNumeric 1) (upper (randAlpha 1)) | join "_" }}
+    {{- $password = randAscii $passwordLength }}
+    {{- $password = regexReplaceAllLiteral "\\W" $password "@" | substr 5 $passwordLength }}
+    {{- $password = printf "%s%s" $subStr $password | toString | shuffle | b64enc | quote }}
+  {{- else }}
+    {{- $password = randAlphaNum $passwordLength | b64enc | quote }}
+  {{- end }}
+{{- end -}}
+{{- printf "%s" $password -}}
+{{- end -}}
+
+{{/*
+Returns whether a previous generated secret already exists
+
+Usage:
+{{ include "common.secrets.exists" (dict "secret" "secret-name" "context" $) }}
+
+Params:
+  - secret - String - Required - Name of the 'Secret' resource where the password is stored.
+  - context - Context - Required - Parent context.
+*/}}
+{{- define "common.secrets.exists" -}}
+{{- $secret := (lookup "v1" "Secret" $.context.Release.Namespace .secret) }}
+{{- if $secret }}
+  {{- true -}}
+{{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Return  the proper Storage Class
+{{ include "common.storage.class" ( dict "persistence" .Values.path.to.the.persistence "global" $) }}
+*/}}
+{{- define "common.storage.class" -}}
+
+{{- $storageClass := .persistence.storageClass -}}
+{{- if .global -}}
+    {{- if .global.storageClass -}}
+        {{- $storageClass = .global.storageClass -}}
+    {{- end -}}
+{{- end -}}
+
+{{- if $storageClass -}}
+  {{- if (eq "-" $storageClass) -}}
+      {{- printf "storageClassName: \"\"" -}}
+  {{- else }}
+      {{- printf "storageClassName: %s" $storageClass -}}
+  {{- end -}}
+{{- end -}}
+
+{{- end -}}
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Renders a value that contains template.
+Usage:
+{{ include "common.tplvalues.render" ( dict "value" .Values.path.to.the.Value "context" $) }}
+*/}}
+{{- define "common.tplvalues.render" -}}
+    {{- if typeIs "string" .value }}
+        {{- tpl .value .context }}
+    {{- else }}
+        {{- tpl (.value | toYaml) .context }}
+    {{- end }}
+{{- end -}}
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Print instructions to get a secret value.
+Usage:
+{{ include "common.utils.secret.getvalue" (dict "secret" "secret-name" "field" "secret-value-field" "context" $) }}
+*/}}
+{{- define "common.utils.secret.getvalue" -}}
+{{- $varname := include "common.utils.fieldToEnvVar" . -}}
+export {{ $varname }}=$(kubectl get secret --namespace {{ .context.Release.Namespace | quote }} {{ .secret }} -o jsonpath="{.data.{{ .field }}}" | base64 --decode)
+{{- end -}}
+
+{{/*
+Build env var name given a field
+Usage:
+{{ include "common.utils.fieldToEnvVar" dict "field" "my-password" }}
+*/}}
+{{- define "common.utils.fieldToEnvVar" -}}
+  {{- $fieldNameSplit := splitList "-" .field -}}
+  {{- $upperCaseFieldNameSplit := list -}}
+
+  {{- range $fieldNameSplit -}}
+    {{- $upperCaseFieldNameSplit = append $upperCaseFieldNameSplit ( upper . ) -}}
+  {{- end -}}
+
+  {{ join "_" $upperCaseFieldNameSplit }}
+{{- end -}}
+
+{{/*
+Gets a value from .Values given
+Usage:
+{{ include "common.utils.getValueFromKey" (dict "key" "path.to.key" "context" $) }}
+*/}}
+{{- define "common.utils.getValueFromKey" -}}
+{{- $splitKey := splitList "." .key -}}
+{{- $value := "" -}}
+{{- $latestObj := $.context.Values -}}
+{{- range $splitKey -}}
+  {{- if not $latestObj -}}
+    {{- printf "please review the entire path of '%s' exists in values" $.key | fail -}}
+  {{- end -}}
+  {{- $value = ( index $latestObj . ) -}}
+  {{- $latestObj = $value -}}
+{{- end -}}
+{{- printf "%v" (default "" $value) -}}
+{{- end -}}
+
+{{/*
+Returns first .Values key with a defined value or first of the list if all non-defined
+Usage:
+{{ include "common.utils.getKeyFromList" (dict "keys" (list "path.to.key1" "path.to.key2") "context" $) }}
+*/}}
+{{- define "common.utils.getKeyFromList" -}}
+{{- $key := first .keys -}}
+{{- $reverseKeys := reverse .keys }}
+{{- range $reverseKeys }}
+  {{- $value := include "common.utils.getValueFromKey" (dict "key" . "context" $.context ) }}
+  {{- if $value -}}
+    {{- $key = . }}
+  {{- end -}}
+{{- end -}}
+{{- printf "%s" $key -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Warning about using rolling tag.
+Usage:
+{{ include "common.warnings.rollingTag" .Values.path.to.the.imageRoot }}
+*/}}
+{{- define "common.warnings.rollingTag" -}}
+
+{{- if and (contains "bitnami/" .repository) (not (.tag | toString | regexFind "-r\\d+$|sha256:")) }}
+WARNING: Rolling tag detected ({{ .repository }}:{{ .tag }}), please note that it is strongly recommended to avoid using rolling tags in a production environment.
++info https://docs.bitnami.com/containers/how-to/understand-rolling-tags-containers/
+{{- end }}
+
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Validate Cassandra required passwords are not empty.
+
+Usage:
+{{ include "common.validations.values.cassandra.passwords" (dict "secret" "secretName" "subchart" false "context" $) }}
+Params:
+  - secret - String - Required. Name of the secret where Cassandra values are stored, e.g: "cassandra-passwords-secret"
+  - subchart - Boolean - Optional. Whether Cassandra is used as subchart or not. Default: false
+*/}}
+{{- define "common.validations.values.cassandra.passwords" -}}
+  {{- $existingSecret := include "common.cassandra.values.existingSecret" . -}}
+  {{- $enabled := include "common.cassandra.values.enabled" . -}}
+  {{- $dbUserPrefix := include "common.cassandra.values.key.dbUser" . -}}
+  {{- $valueKeyPassword := printf "%s.password" $dbUserPrefix -}}
+
+  {{- if and (not $existingSecret) (eq $enabled "true") -}}
+    {{- $requiredPasswords := list -}}
+
+    {{- $requiredPassword := dict "valueKey" $valueKeyPassword "secret" .secret "field" "cassandra-password" -}}
+    {{- $requiredPasswords = append $requiredPasswords $requiredPassword -}}
+
+    {{- include "common.validations.values.multiple.empty" (dict "required" $requiredPasswords "context" .context) -}}
+
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for existingSecret.
+
+Usage:
+{{ include "common.cassandra.values.existingSecret" (dict "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether Cassandra is used as subchart or not. Default: false
+*/}}
+{{- define "common.cassandra.values.existingSecret" -}}
+  {{- if .subchart -}}
+    {{- .context.Values.cassandra.dbUser.existingSecret | quote -}}
+  {{- else -}}
+    {{- .context.Values.dbUser.existingSecret | quote -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for enabled cassandra.
+
+Usage:
+{{ include "common.cassandra.values.enabled" (dict "context" $) }}
+*/}}
+{{- define "common.cassandra.values.enabled" -}}
+  {{- if .subchart -}}
+    {{- printf "%v" .context.Values.cassandra.enabled -}}
+  {{- else -}}
+    {{- printf "%v" (not .context.Values.enabled) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for the key dbUser
+
+Usage:
+{{ include "common.cassandra.values.key.dbUser" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether Cassandra is used as subchart or not. Default: false
+*/}}
+{{- define "common.cassandra.values.key.dbUser" -}}
+  {{- if .subchart -}}
+    cassandra.dbUser
+  {{- else -}}
+    dbUser
+  {{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Validate MariaDB required passwords are not empty.
+
+Usage:
+{{ include "common.validations.values.mariadb.passwords" (dict "secret" "secretName" "subchart" false "context" $) }}
+Params:
+  - secret - String - Required. Name of the secret where MariaDB values are stored, e.g: "mysql-passwords-secret"
+  - subchart - Boolean - Optional. Whether MariaDB is used as subchart or not. Default: false
+*/}}
+{{- define "common.validations.values.mariadb.passwords" -}}
+  {{- $existingSecret := include "common.mariadb.values.auth.existingSecret" . -}}
+  {{- $enabled := include "common.mariadb.values.enabled" . -}}
+  {{- $architecture := include "common.mariadb.values.architecture" . -}}
+  {{- $authPrefix := include "common.mariadb.values.key.auth" . -}}
+  {{- $valueKeyRootPassword := printf "%s.rootPassword" $authPrefix -}}
+  {{- $valueKeyUsername := printf "%s.username" $authPrefix -}}
+  {{- $valueKeyPassword := printf "%s.password" $authPrefix -}}
+  {{- $valueKeyReplicationPassword := printf "%s.replicationPassword" $authPrefix -}}
+
+  {{- if and (not $existingSecret) (eq $enabled "true") -}}
+    {{- $requiredPasswords := list -}}
+
+    {{- $requiredRootPassword := dict "valueKey" $valueKeyRootPassword "secret" .secret "field" "mariadb-root-password" -}}
+    {{- $requiredPasswords = append $requiredPasswords $requiredRootPassword -}}
+
+    {{- $valueUsername := include "common.utils.getValueFromKey" (dict "key" $valueKeyUsername "context" .context) }}
+    {{- if not (empty $valueUsername) -}}
+        {{- $requiredPassword := dict "valueKey" $valueKeyPassword "secret" .secret "field" "mariadb-password" -}}
+        {{- $requiredPasswords = append $requiredPasswords $requiredPassword -}}
+    {{- end -}}
+
+    {{- if (eq $architecture "replication") -}}
+        {{- $requiredReplicationPassword := dict "valueKey" $valueKeyReplicationPassword "secret" .secret "field" "mariadb-replication-password" -}}
+        {{- $requiredPasswords = append $requiredPasswords $requiredReplicationPassword -}}
+    {{- end -}}
+
+    {{- include "common.validations.values.multiple.empty" (dict "required" $requiredPasswords "context" .context) -}}
+
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for existingSecret.
+
+Usage:
+{{ include "common.mariadb.values.auth.existingSecret" (dict "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether MariaDB is used as subchart or not. Default: false
+*/}}
+{{- define "common.mariadb.values.auth.existingSecret" -}}
+  {{- if .subchart -}}
+    {{- .context.Values.mariadb.auth.existingSecret | quote -}}
+  {{- else -}}
+    {{- .context.Values.auth.existingSecret | quote -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for enabled mariadb.
+
+Usage:
+{{ include "common.mariadb.values.enabled" (dict "context" $) }}
+*/}}
+{{- define "common.mariadb.values.enabled" -}}
+  {{- if .subchart -}}
+    {{- printf "%v" .context.Values.mariadb.enabled -}}
+  {{- else -}}
+    {{- printf "%v" (not .context.Values.enabled) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for architecture
+
+Usage:
+{{ include "common.mariadb.values.architecture" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether MariaDB is used as subchart or not. Default: false
+*/}}
+{{- define "common.mariadb.values.architecture" -}}
+  {{- if .subchart -}}
+    {{- .context.Values.mariadb.architecture -}}
+  {{- else -}}
+    {{- .context.Values.architecture -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for the key auth
+
+Usage:
+{{ include "common.mariadb.values.key.auth" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether MariaDB is used as subchart or not. Default: false
+*/}}
+{{- define "common.mariadb.values.key.auth" -}}
+  {{- if .subchart -}}
+    mariadb.auth
+  {{- else -}}
+    auth
+  {{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Validate MongoDB(R) required passwords are not empty.
+
+Usage:
+{{ include "common.validations.values.mongodb.passwords" (dict "secret" "secretName" "subchart" false "context" $) }}
+Params:
+  - secret - String - Required. Name of the secret where MongoDB(R) values are stored, e.g: "mongodb-passwords-secret"
+  - subchart - Boolean - Optional. Whether MongoDB(R) is used as subchart or not. Default: false
+*/}}
+{{- define "common.validations.values.mongodb.passwords" -}}
+  {{- $existingSecret := include "common.mongodb.values.auth.existingSecret" . -}}
+  {{- $enabled := include "common.mongodb.values.enabled" . -}}
+  {{- $authPrefix := include "common.mongodb.values.key.auth" . -}}
+  {{- $architecture := include "common.mongodb.values.architecture" . -}}
+  {{- $valueKeyRootPassword := printf "%s.rootPassword" $authPrefix -}}
+  {{- $valueKeyUsername := printf "%s.username" $authPrefix -}}
+  {{- $valueKeyDatabase := printf "%s.database" $authPrefix -}}
+  {{- $valueKeyPassword := printf "%s.password" $authPrefix -}}
+  {{- $valueKeyReplicaSetKey := printf "%s.replicaSetKey" $authPrefix -}}
+  {{- $valueKeyAuthEnabled := printf "%s.enabled" $authPrefix -}}
+
+  {{- $authEnabled := include "common.utils.getValueFromKey" (dict "key" $valueKeyAuthEnabled "context" .context) -}}
+
+  {{- if and (not $existingSecret) (eq $enabled "true") (eq $authEnabled "true") -}}
+    {{- $requiredPasswords := list -}}
+
+    {{- $requiredRootPassword := dict "valueKey" $valueKeyRootPassword "secret" .secret "field" "mongodb-root-password" -}}
+    {{- $requiredPasswords = append $requiredPasswords $requiredRootPassword -}}
+
+    {{- $valueUsername := include "common.utils.getValueFromKey" (dict "key" $valueKeyUsername "context" .context) }}
+    {{- $valueDatabase := include "common.utils.getValueFromKey" (dict "key" $valueKeyDatabase "context" .context) }}
+    {{- if and $valueUsername $valueDatabase -}}
+        {{- $requiredPassword := dict "valueKey" $valueKeyPassword "secret" .secret "field" "mongodb-password" -}}
+        {{- $requiredPasswords = append $requiredPasswords $requiredPassword -}}
+    {{- end -}}
+
+    {{- if (eq $architecture "replicaset") -}}
+        {{- $requiredReplicaSetKey := dict "valueKey" $valueKeyReplicaSetKey "secret" .secret "field" "mongodb-replica-set-key" -}}
+        {{- $requiredPasswords = append $requiredPasswords $requiredReplicaSetKey -}}
+    {{- end -}}
+
+    {{- include "common.validations.values.multiple.empty" (dict "required" $requiredPasswords "context" .context) -}}
+
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for existingSecret.
+
+Usage:
+{{ include "common.mongodb.values.auth.existingSecret" (dict "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether MongoDb is used as subchart or not. Default: false
+*/}}
+{{- define "common.mongodb.values.auth.existingSecret" -}}
+  {{- if .subchart -}}
+    {{- .context.Values.mongodb.auth.existingSecret | quote -}}
+  {{- else -}}
+    {{- .context.Values.auth.existingSecret | quote -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for enabled mongodb.
+
+Usage:
+{{ include "common.mongodb.values.enabled" (dict "context" $) }}
+*/}}
+{{- define "common.mongodb.values.enabled" -}}
+  {{- if .subchart -}}
+    {{- printf "%v" .context.Values.mongodb.enabled -}}
+  {{- else -}}
+    {{- printf "%v" (not .context.Values.enabled) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for the key auth
+
+Usage:
+{{ include "common.mongodb.values.key.auth" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether MongoDB(R) is used as subchart or not. Default: false
+*/}}
+{{- define "common.mongodb.values.key.auth" -}}
+  {{- if .subchart -}}
+    mongodb.auth
+  {{- else -}}
+    auth
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for architecture
+
+Usage:
+{{ include "common.mongodb.values.architecture" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether MariaDB is used as subchart or not. Default: false
+*/}}
+{{- define "common.mongodb.values.architecture" -}}
+  {{- if .subchart -}}
+    {{- .context.Values.mongodb.architecture -}}
+  {{- else -}}
+    {{- .context.Values.architecture -}}
+  {{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Validate PostgreSQL required passwords are not empty.
+
+Usage:
+{{ include "common.validations.values.postgresql.passwords" (dict "secret" "secretName" "subchart" false "context" $) }}
+Params:
+  - secret - String - Required. Name of the secret where postgresql values are stored, e.g: "postgresql-passwords-secret"
+  - subchart - Boolean - Optional. Whether postgresql is used as subchart or not. Default: false
+*/}}
+{{- define "common.validations.values.postgresql.passwords" -}}
+  {{- $existingSecret := include "common.postgresql.values.existingSecret" . -}}
+  {{- $enabled := include "common.postgresql.values.enabled" . -}}
+  {{- $valueKeyPostgresqlPassword := include "common.postgresql.values.key.postgressPassword" . -}}
+  {{- $valueKeyPostgresqlReplicationEnabled := include "common.postgresql.values.key.replicationPassword" . -}}
+
+  {{- if and (not $existingSecret) (eq $enabled "true") -}}
+    {{- $requiredPasswords := list -}}
+
+    {{- $requiredPostgresqlPassword := dict "valueKey" $valueKeyPostgresqlPassword "secret" .secret "field" "postgresql-password" -}}
+    {{- $requiredPasswords = append $requiredPasswords $requiredPostgresqlPassword -}}
+
+    {{- $enabledReplication := include "common.postgresql.values.enabled.replication" . -}}
+    {{- if (eq $enabledReplication "true") -}}
+        {{- $requiredPostgresqlReplicationPassword := dict "valueKey" $valueKeyPostgresqlReplicationEnabled "secret" .secret "field" "postgresql-replication-password" -}}
+        {{- $requiredPasswords = append $requiredPasswords $requiredPostgresqlReplicationPassword -}}
+    {{- end -}}
+
+    {{- include "common.validations.values.multiple.empty" (dict "required" $requiredPasswords "context" .context) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to decide whether evaluate global values.
+
+Usage:
+{{ include "common.postgresql.values.use.global" (dict "key" "key-of-global" "context" $) }}
+Params:
+  - key - String - Required. Field to be evaluated within global, e.g: "existingSecret"
+*/}}
+{{- define "common.postgresql.values.use.global" -}}
+  {{- if .context.Values.global -}}
+    {{- if .context.Values.global.postgresql -}}
+      {{- index .context.Values.global.postgresql .key | quote -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for existingSecret.
+
+Usage:
+{{ include "common.postgresql.values.existingSecret" (dict "context" $) }}
+*/}}
+{{- define "common.postgresql.values.existingSecret" -}}
+  {{- $globalValue := include "common.postgresql.values.use.global" (dict "key" "existingSecret" "context" .context) -}}
+
+  {{- if .subchart -}}
+    {{- default (.context.Values.postgresql.existingSecret | quote) $globalValue -}}
+  {{- else -}}
+    {{- default (.context.Values.existingSecret | quote) $globalValue -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for enabled postgresql.
+
+Usage:
+{{ include "common.postgresql.values.enabled" (dict "context" $) }}
+*/}}
+{{- define "common.postgresql.values.enabled" -}}
+  {{- if .subchart -}}
+    {{- printf "%v" .context.Values.postgresql.enabled -}}
+  {{- else -}}
+    {{- printf "%v" (not .context.Values.enabled) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for the key postgressPassword.
+
+Usage:
+{{ include "common.postgresql.values.key.postgressPassword" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether postgresql is used as subchart or not. Default: false
+*/}}
+{{- define "common.postgresql.values.key.postgressPassword" -}}
+  {{- $globalValue := include "common.postgresql.values.use.global" (dict "key" "postgresqlUsername" "context" .context) -}}
+
+  {{- if not $globalValue -}}
+    {{- if .subchart -}}
+      postgresql.postgresqlPassword
+    {{- else -}}
+      postgresqlPassword
+    {{- end -}}
+  {{- else -}}
+    global.postgresql.postgresqlPassword
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for enabled.replication.
+
+Usage:
+{{ include "common.postgresql.values.enabled.replication" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether postgresql is used as subchart or not. Default: false
+*/}}
+{{- define "common.postgresql.values.enabled.replication" -}}
+  {{- if .subchart -}}
+    {{- printf "%v" .context.Values.postgresql.replication.enabled -}}
+  {{- else -}}
+    {{- printf "%v" .context.Values.replication.enabled -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for the key replication.password.
+
+Usage:
+{{ include "common.postgresql.values.key.replicationPassword" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether postgresql is used as subchart or not. Default: false
+*/}}
+{{- define "common.postgresql.values.key.replicationPassword" -}}
+  {{- if .subchart -}}
+    postgresql.replication.password
+  {{- else -}}
+    replication.password
+  {{- end -}}
+{{- end -}}
+
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Validate Redis(TM) required passwords are not empty.
+
+Usage:
+{{ include "common.validations.values.redis.passwords" (dict "secret" "secretName" "subchart" false "context" $) }}
+Params:
+  - secret - String - Required. Name of the secret where redis values are stored, e.g: "redis-passwords-secret"
+  - subchart - Boolean - Optional. Whether redis is used as subchart or not. Default: false
+*/}}
+{{- define "common.validations.values.redis.passwords" -}}
+  {{- $enabled := include "common.redis.values.enabled" . -}}
+  {{- $valueKeyPrefix := include "common.redis.values.keys.prefix" . -}}
+  {{- $standarizedVersion := include "common.redis.values.standarized.version" . }}
+
+  {{- $existingSecret := ternary (printf "%s%s" $valueKeyPrefix "auth.existingSecret") (printf "%s%s" $valueKeyPrefix "existingSecret") (eq $standarizedVersion "true") }}
+  {{- $existingSecretValue := include "common.utils.getValueFromKey" (dict "key" $existingSecret "context" .context) }}
+
+  {{- $valueKeyRedisPassword := ternary (printf "%s%s" $valueKeyPrefix "auth.password") (printf "%s%s" $valueKeyPrefix "password") (eq $standarizedVersion "true") }}
+  {{- $valueKeyRedisUseAuth := ternary (printf "%s%s" $valueKeyPrefix "auth.enabled") (printf "%s%s" $valueKeyPrefix "usePassword") (eq $standarizedVersion "true") }}
+
+  {{- if and (not $existingSecretValue) (eq $enabled "true") -}}
+    {{- $requiredPasswords := list -}}
+
+    {{- $useAuth := include "common.utils.getValueFromKey" (dict "key" $valueKeyRedisUseAuth "context" .context) -}}
+    {{- if eq $useAuth "true" -}}
+      {{- $requiredRedisPassword := dict "valueKey" $valueKeyRedisPassword "secret" .secret "field" "redis-password" -}}
+      {{- $requiredPasswords = append $requiredPasswords $requiredRedisPassword -}}
+    {{- end -}}
+
+    {{- include "common.validations.values.multiple.empty" (dict "required" $requiredPasswords "context" .context) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right value for enabled redis.
+
+Usage:
+{{ include "common.redis.values.enabled" (dict "context" $) }}
+*/}}
+{{- define "common.redis.values.enabled" -}}
+  {{- if .subchart -}}
+    {{- printf "%v" .context.Values.redis.enabled -}}
+  {{- else -}}
+    {{- printf "%v" (not .context.Values.enabled) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Auxiliary function to get the right prefix path for the values
+
+Usage:
+{{ include "common.redis.values.key.prefix" (dict "subchart" "true" "context" $) }}
+Params:
+  - subchart - Boolean - Optional. Whether redis is used as subchart or not. Default: false
+*/}}
+{{- define "common.redis.values.keys.prefix" -}}
+  {{- if .subchart -}}redis.{{- else -}}{{- end -}}
+{{- end -}}
+
+{{/*
+Checks whether the redis chart's includes the standarizations (version >= 14)
+
+Usage:
+{{ include "common.redis.values.standarized.version" (dict "context" $) }}
+*/}}
+{{- define "common.redis.values.standarized.version" -}}
+
+  {{- $standarizedAuth := printf "%s%s" (include "common.redis.values.keys.prefix" .) "auth" -}}
+  {{- $standarizedAuthValues := include "common.utils.getValueFromKey" (dict "key" $standarizedAuth "context" .context) }}
+
+  {{- if $standarizedAuthValues -}}
+    {{- true -}}
+  {{- end -}}
+{{- end -}}
+
+
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Validate values must not be empty.
+
+Usage:
+{{- $validateValueConf00 := (dict "valueKey" "path.to.value" "secret" "secretName" "field" "password-00") -}}
+{{- $validateValueConf01 := (dict "valueKey" "path.to.value" "secret" "secretName" "field" "password-01") -}}
+{{ include "common.validations.values.empty" (dict "required" (list $validateValueConf00 $validateValueConf01) "context" $) }}
+
+Validate value params:
+  - valueKey - String - Required. The path to the validating value in the values.yaml, e.g: "mysql.password"
+  - secret - String - Optional. Name of the secret where the validating value is generated/stored, e.g: "mysql-passwords-secret"
+  - field - String - Optional. Name of the field in the secret data, e.g: "mysql-password"
+*/}}
+{{- define "common.validations.values.multiple.empty" -}}
+  {{- range .required -}}
+    {{- include "common.validations.values.single.empty" (dict "valueKey" .valueKey "secret" .secret "field" .field "context" $.context) -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Validate a value must not be empty.
+
+Usage:
+{{ include "common.validations.value.empty" (dict "valueKey" "mariadb.password" "secret" "secretName" "field" "my-password" "subchart" "subchart" "context" $) }}
+
+Validate value params:
+  - valueKey - String - Required. The path to the validating value in the values.yaml, e.g: "mysql.password"
+  - secret - String - Optional. Name of the secret where the validating value is generated/stored, e.g: "mysql-passwords-secret"
+  - field - String - Optional. Name of the field in the secret data, e.g: "mysql-password"
+  - subchart - String - Optional - Name of the subchart that the validated password is part of.
+*/}}
+{{- define "common.validations.values.single.empty" -}}
+  {{- $value := include "common.utils.getValueFromKey" (dict "key" .valueKey "context" .context) }}
+  {{- $subchart := ternary "" (printf "%s." .subchart) (empty .subchart) }}
+
+  {{- if not $value -}}
+    {{- $varname := "my-value" -}}
+    {{- $getCurrentValue := "" -}}
+    {{- if and .secret .field -}}
+      {{- $varname = include "common.utils.fieldToEnvVar" . -}}
+      {{- $getCurrentValue = printf " To get the current value:\n\n        %s\n" (include "common.utils.secret.getvalue" .) -}}
+    {{- end -}}
+    {{- printf "\n    '%s' must not be empty, please add '--set %s%s=$%s' to the command.%s" .valueKey $subchart .valueKey $varname $getCurrentValue -}}
+  {{- end -}}
+{{- end -}}
+
+{{/* vim: set filetype=mustache: */}}
+
+{{/*
+Return a soft nodeAffinity definition
+{{ include "common.affinities.nodes.soft" (dict "key" "FOO" "values" (list "BAR" "BAZ")) -}}
+*/}}
+{{- define "common.affinities.nodes.soft" -}}
+preferredDuringSchedulingIgnoredDuringExecution:
+  - preference:
+      matchExpressions:
+        - key: {{ .key }}
+          operator: In
+          values:
+            {{- range .values }}
+            - {{ . | quote }}
+            {{- end }}
+    weight: 1
+{{- end -}}
+
+{{/*
+Return a hard nodeAffinity definition
+{{ include "common.affinities.nodes.hard" (dict "key" "FOO" "values" (list "BAR" "BAZ")) -}}
+*/}}
+{{- define "common.affinities.nodes.hard" -}}
+requiredDuringSchedulingIgnoredDuringExecution:
+  nodeSelectorTerms:
+    - matchExpressions:
+        - key: {{ .key }}
+          operator: In
+          values:
+            {{- range .values }}
+            - {{ . | quote }}
+            {{- end }}
+{{- end -}}
+
+{{/*
+Return a nodeAffinity definition
+{{ include "common.affinities.nodes" (dict "type" "soft" "key" "FOO" "values" (list "BAR" "BAZ")) -}}
+*/}}
+{{- define "common.affinities.nodes" -}}
+  {{- if eq .type "soft" }}
+    {{- include "common.affinities.nodes.soft" . -}}
+  {{- else if eq .type "hard" }}
+    {{- include "common.affinities.nodes.hard" . -}}
+  {{- end -}}
+{{- end -}}
+
+{{/*
+Return a soft podAffinity/podAntiAffinity definition
+{{ include "common.affinities.pods.soft" (dict "component" "FOO" "extraMatchLabels" .Values.extraMatchLabels "context" $) -}}
+*/}}
+{{- define "common.affinities.pods.soft" -}}
+{{- $component := default "" .component -}}
+{{- $extraMatchLabels := default (dict) .extraMatchLabels -}}
+preferredDuringSchedulingIgnoredDuringExecution:
+  - podAffinityTerm:
+      labelSelector:
+        matchLabels: {{- (include "common.labels.matchLabels" .context) | nindent 10 }}
+          {{- if not (empty $component) }}
+          {{ printf "app.kubernetes.io/component: %s" $component }}
+          {{- end }}
+          {{- range $key, $value := $extraMatchLabels }}
+          {{ $key }}: {{ $value | quote }}
+          {{- end }}
+      namespaces:
+        - {{ .context.Release.Namespace | quote }}
+      topologyKey: kubernetes.io/hostname
+    weight: 1
+{{- end -}}
+
+{{/*
+Return a hard podAffinity/podAntiAffinity definition
+{{ include "common.affinities.pods.hard" (dict "component" "FOO" "extraMatchLabels" .Values.extraMatchLabels "context" $) -}}
+*/}}
+{{- define "common.affinities.pods.hard" -}}
+{{- $component := default "" .component -}}
+{{- $extraMatchLabels := default (dict) .extraMatchLabels -}}
+requiredDuringSchedulingIgnoredDuringExecution:
+  - labelSelector:
+      matchLabels: {{- (include "common.labels.matchLabels" .context) | nindent 8 }}
+        {{- if not (empty $component) }}
+        {{ printf "app.kubernetes.io/component: %s" $component }}
+        {{- end }}
+        {{- range $key, $value := $extraMatchLabels }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+    namespaces:
+      - {{ .context.Release.Namespace | quote }}
+    topologyKey: kubernetes.io/hostname
+{{- end -}}
+
+{{/*
+Return a podAffinity/podAntiAffinity definition
+{{ include "common.affinities.pods" (dict "type" "soft" "key" "FOO" "values" (list "BAR" "BAZ")) -}}
+*/}}
+{{- define "common.affinities.pods" -}}
+  {{- if eq .type "soft" }}
+    {{- include "common.affinities.pods.soft" . -}}
+  {{- else if eq .type "hard" }}
+    {{- include "common.affinities.pods.hard" . -}}
+  {{- end -}}
+{{- end -}}

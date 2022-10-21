@@ -35,7 +35,8 @@
 #                        much smaller.
 #
 # Use the same builder frontend version for everyone
-ARG AIRFLOW_EXTRAS="amazon,async,celery,cncf.kubernetes,dask,docker,elasticsearch,ftp,grpc,hashicorp,http,ldap,mysql,odbc,pandas,redis,postgres,sendgrid,sftp,slack,ssh,statsd,virtualenv"
+ARG AIRFLOW_EXTRAS="flower,npm,nodejs,amazon,async,celery,cncf.kubernetes,dask,docker,elasticsearch,ftp,grpc,hashicorp,http,ldap,mysql,odbc,pandas,redis,postgres,sendgrid,sftp,slack,ssh,statsd,virtualenv"
+
 ARG ADDITIONAL_AIRFLOW_EXTRAS=""
 ARG ADDITIONAL_PYTHON_DEPS=""
 
@@ -353,7 +354,7 @@ ENV PYTHON_BASE_IMAGE=${PYTHON_BASE_IMAGE} \
     LC_CTYPE=C.UTF-8 LC_MESSAGES=C.UTF-8 LD_LIBRARY_PATH=/usr/local/lib \
     AIRFLOW_PIP_VERSION=${AIRFLOW_PIP_VERSION}
 
-ARG RUNTIME_APT_DEPS="mlocate netcat gosu dumb-init python-six ca-certificates sudo passwd python3-pip build-essential libcairo2-dev python3-dev python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev pkg-config shared-mime-info libldap-2.4-2 libldap-common unixodbc-dev"
+ARG RUNTIME_APT_DEPS="python3-jinja2 python3-tornado vim mlocate netcat gosu dumb-init python-six ca-certificates sudo passwd python3-pip build-essential libcairo2-dev python3-dev python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev pkg-config shared-mime-info libldap-2.4-2 libldap-common unixodbc-dev"
 ARG ADDITIONAL_RUNTIME_APT_DEPS=""
 ARG RUNTIME_APT_COMMAND="echo"
 ARG ADDITIONAL_RUNTIME_APT_COMMAND=""
@@ -458,12 +459,6 @@ RUN chmod u+x /root/bin/pip
 # Fix python symbolic link
 RUN cd /usr/bin && ln -sf python2.7 python
 RUN cd /usr/bin && ln -sf python3.8 python
-
-#RUN echo "Update go"
-#COPY ./files/go1.19.2.linux-amd64.tar.gz /tmp
-#RUN tar -C /usr/local -zxvf /tmp/go1.19.2.linux-amd64.tar.gz
-#ENV PATH=${PATH}:/usr/local/go/bin
-
 
 WORKDIR ${AIRFLOW_HOME}
 

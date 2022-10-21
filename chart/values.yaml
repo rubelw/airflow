@@ -1,4 +1,5 @@
 # Licensed to the Apache Software Foundation (ASF) under one
+# Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
 # regarding copyright ownership.  The ASF licenses this file
@@ -92,14 +93,15 @@ images:
     tag: airflow-pgbouncer-exporter-2021.09.22-0.12.0
     pullPolicy: IfNotPresent
   gitSync:
-    repository: k8s.gcr.io/git-sync/git-sync
-    tag: v3.4.0
+    repository: rubelw/git-sync
+    tag: latest
     pullPolicy: IfNotPresent
 
 
 # Select certain nodes for airflow pods.
 nodeSelector: {}
 affinity: {}
+
 tolerations: []
 topologySpreadConstraints: []
 
@@ -1132,7 +1134,7 @@ triggerer:
 
 # Airflow Dag Processor Config
 dagProcessor:
-  enabled: false
+  enabled: true
   # Number of airflow dag processors in the deployment
   replicas: 1
   # Max number of old replicasets to retain
@@ -1326,7 +1328,7 @@ flower:
 
 # StatsD settings
 statsd:
-  enabled: false
+  enabled: true
   # Max number of old replicasets to retain
   revisionHistoryLimit: ~
 
@@ -1779,6 +1781,7 @@ dags:
   gitSync:
     enabled: false
 
+
     # git repo clone url
     # ssh examples ssh://git@github.com/apache/airflow.git
     # git@github.com:apache/airflow.git
@@ -1994,7 +1997,7 @@ schedulerName:
 ## @param securityContext.enabled Enable security context
 ## @param securityContext.fsGroup Group ID for the pod
 ##
-securityContext:
+postgresSecurityContext:
   enabled: true
   fsGroup: 1001
 ## Container Security Context

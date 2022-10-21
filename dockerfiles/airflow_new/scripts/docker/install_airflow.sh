@@ -101,8 +101,6 @@ function install_airflow() {
         pip install packaging==21.0
         pip install zipp==3.1.0
 
-
-
         pip install ${AIRFLOW_INSTALL_EDITABLE_FLAG} \
             ${ADDITIONAL_PIP_INSTALL_FLAGS} \
             "${AIRFLOW_INSTALLATION_METHOD}[${AIRFLOW_EXTRAS}]${AIRFLOW_VERSION_SPECIFICATION}"
@@ -127,7 +125,6 @@ function install_airflow() {
 common::get_colors
 common::get_airflow_version_specification
 common::override_pip_version_if_needed
-#common::get_constraints_location
 common::show_pip_version_and_location
 
 install_airflow

@@ -1,4 +1,20 @@
 
+Based on: http://marclamberti.com/blog/airflow-kubernetes-executor/
+
+ minikube start --kubernetes-version=v1.23.0 --memory 20000 --cpus 3
+
+cd airflow/scripts/ci/kubernetes/
+./docker/build.sh 
+
+update compile.sh to node 12
+
+curl -sL https://deb.nodesource.com/setup_12.x | bash -
+
+use kubectl conver -f file to convert old templates
+
+./kube/deploy.sh -d persistent_mode
+
+
 
 ```bash
 minikube start --memory 8192 --cpus 2
@@ -21,5 +37,16 @@ airflow-worker-0                     2/2     Running   0          7m6s
 
 ```bash
 kubectl port-forward svc/airflow-webserver 8080:8080 --namespace default
+
+```
+
+If you need Celery executor for flower
+
+```bash
+helm install airflow chart/ --values chart/values.yaml  --set executor=CeleryExecutor --set workers.persistence.size=1Gi
+
+or 
+
+helm install airflow chart/ --values chart/values.yaml  --set executor=CeleryKubernetesExecutor --set workers.persistence.size=1Gi
 
 ```
