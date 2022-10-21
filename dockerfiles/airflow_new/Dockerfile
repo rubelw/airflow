@@ -354,7 +354,7 @@ ENV PYTHON_BASE_IMAGE=${PYTHON_BASE_IMAGE} \
     LC_CTYPE=C.UTF-8 LC_MESSAGES=C.UTF-8 LD_LIBRARY_PATH=/usr/local/lib \
     AIRFLOW_PIP_VERSION=${AIRFLOW_PIP_VERSION}
 
-ARG RUNTIME_APT_DEPS="python3-jinja2 python3-tornado vim mlocate netcat gosu dumb-init python-six ca-certificates sudo passwd python3-pip build-essential libcairo2-dev python3-dev python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev pkg-config shared-mime-info libldap-2.4-2 libldap-common unixodbc-dev"
+ARG RUNTIME_APT_DEPS="ldap-utils iputils-ping python3-jinja2 python3-tornado vim mlocate netcat gosu dumb-init python-six ca-certificates sudo passwd python3-pip build-essential libcairo2-dev python3-dev python3-setuptools python3-wheel python3-cffi libcairo2 libpango-1.0-0 libgdk-pixbuf2.0-0 libffi-dev pkg-config shared-mime-info libldap-2.4-2 libldap-common unixodbc-dev"
 ARG ADDITIONAL_RUNTIME_APT_DEPS=""
 ARG RUNTIME_APT_COMMAND="echo"
 ARG ADDITIONAL_RUNTIME_APT_COMMAND=""

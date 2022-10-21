@@ -973,7 +973,7 @@ webserver:
 
   # This string (can be templated) will be mounted into the Airflow Webserver as a custom
   # webserver_config.py. You can bake a webserver_config.py in to your image instead.
-  webserverConfig: ~
+  #webserverConfig: ~
   # webserverConfig: |
   #   from airflow import configuration as conf
 
@@ -982,6 +982,67 @@ webserver:
 
   #   # Flask-WTF flag for CSRF
   #   CSRF_ENABLED = True
+
+  #####
+  # To implement LDAP
+  webserverConfig: |
+    import os
+    from airflow import configuration as conf
+    from airflow.www.fab_security.manager import AUTH_LDAP
+
+    basedir = os.path.abspath(os.path.dirname(__file__))
+    # The SQLAlchemy connection string.
+    SQLALCHEMY_DATABASE_URI = conf.get('core', 'SQL_ALCHEMY_CONN')
+
+    # Flask-WTF flag for CSRF
+    CSRF_ENABLED = True
+    AUTH_TYPE = AUTH_LDAP
+    AUTH_LDAP_SERVER = 'ldap://ldap-service:389'
+
+    # search configs
+    AUTH_LDAP_SEARCH = 'dc=example,dc=org'
+    AUTH_LDAP_UID_FIELD = 'cn'
+    AUTH_LDAP_ALLOW_SELF_SIGNED = True
+    # username and password to login IBM Bluepages
+    AUTH_LDAP_BIND_USER = 'cn=admin,dc=example,dc=org'
+    AUTH_LDAP_BIND_PASSWORD = 'admin'
+
+    # Will allow user self registration
+    AUTH_USER_REGISTRATION = False
+    # Required if not mapping from LDAP DN
+    #AUTH_USER_REGISTRATION_ROLE = 'Viewer'
+    #AUTH_LDAP_FIRSTNAME_FIELD = "givenName"
+    #AUTH_LDAP_LASTNAME_FIELD = "sn"
+    #AUTH_LDAP_EMAIL_FIELD = "mail"
+
+
+  # ----------------------------------------------------
+  # Theme CONFIG
+  # ----------------------------------------------------
+  # Flask App Builder comes up with a number of predefined themes
+  # that you can use for Apache Airflow.
+  # http://flask-appbuilder.readthedocs.io/en/latest/customizing.html#changing-themes
+  # Please make sure to remove "navbar_color" configuration from airflow.cfg
+  # in order to fully utilize the theme. (or use that property in conjunction with theme)
+  # APP_THEME = "bootstrap-theme.css"  # default bootstrap
+  # APP_THEME = "amelia.css"
+  # APP_THEME = "cerulean.css"
+  # APP_THEME = "cosmo.css"
+  # APP_THEME = "cyborg.css"
+  # APP_THEME = "darkly.css"
+  # APP_THEME = "flatly.css"
+  # APP_THEME = "journal.css"
+  # APP_THEME = "lumen.css"
+  # APP_THEME = "paper.css"
+  # APP_THEME = "readable.css"
+  # APP_THEME = "sandstone.css"
+  # APP_THEME = "simplex.css"
+  # APP_THEME = "slate.css"
+  # APP_THEME = "solar.css"
+  # APP_THEME = "spacelab.css"
+  # APP_THEME = "superhero.css"
+  # APP_THEME = "united.css"
+  # APP_THEME = "yeti.css"
 
   service:
     type: ClusterIP
@@ -2672,7 +2733,7 @@ tls:
 metrics:
   ## @param metrics.enabled Start a prometheus exporter
   ##
-  enabled: true
+  enabled: false
   ## @param metrics.resources Prometheus exporter container resources
   ##
   resources: {}

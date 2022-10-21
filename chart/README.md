@@ -50,3 +50,7 @@ or
 helm install airflow chart/ --values chart/values.yaml  --set executor=CeleryKubernetesExecutor --set workers.persistence.size=1Gi
 
 ```
+
+ ldapsearch -x -W -d 1 -h ldap-service -p 389 -b "cn=admin,dc=example,dc=org" -D "dc=example,dc=org"
+
+
