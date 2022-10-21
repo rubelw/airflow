@@ -77,8 +77,8 @@ images:
     tag: ~
     pullPolicy: IfNotPresent
   statsd:
-    repository: quay.io/prometheus/statsd-exporter
-    tag: v0.22.8
+    repository: rubelw/statsd-exporter
+    tag: latest
     pullPolicy: IfNotPresent
   redis:
     repository: rubelw/redis
@@ -89,8 +89,8 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
   pgbouncerExporter:
-    repository: apache/airflow
-    tag: airflow-pgbouncer-exporter-2021.09.22-0.12.0
+    repository: rubelw/pgbouncer-exporter
+    tag: latest
     pullPolicy: IfNotPresent
   gitSync:
     repository: rubelw/git-sync
@@ -1660,12 +1660,7 @@ cleanup:
   failedJobsHistoryLimit: ~
   successfulJobsHistoryLimit: ~
 
-# Configuration for postgresql subchart
-# Not recommended for production
-postgresql:
-  enabled: true
-  postgresqlPassword: postgres
-  postgresqlUsername: postgres
+
 
 # Config settings to go into the mounted airflow.cfg
 #
@@ -1859,6 +1854,13 @@ logs:
     storageClassName:
     ## the name of an existing PVC to use
     existingClaim:
+
+# Configuration for postgresql subchart
+# Not recommended for production
+postgresql:
+  enabled: true
+  postgresqlPassword: postgres
+  postgresqlUsername: postgres
 
 #==============================
 ## bitnami/common
@@ -2670,7 +2672,7 @@ tls:
 metrics:
   ## @param metrics.enabled Start a prometheus exporter
   ##
-  enabled: false
+  enabled: true
   ## @param metrics.resources Prometheus exporter container resources
   ##
   resources: {}
@@ -2731,8 +2733,8 @@ metrics:
   ##
   image:
     registry: docker.io
-    repository: bitnami/postgres-exporter
-    tag: 0.9.0-debian-10-r108
+    repository: rubelw/postgres-exporter
+    tag: latest
     pullPolicy: IfNotPresent
     ## Optionally specify an array of imagePullSecrets.
     ## Secrets must be manually created in the namespace.

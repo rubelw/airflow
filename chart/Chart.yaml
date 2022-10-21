@@ -32,7 +32,7 @@ keywords:
   - airflow
   - workflow
   - scheduler
-#dependencies:
+#dependencies:   # use the postgres container locally
 #  - name: postgresql
 #    version: 10.5.3
 #    condition: postgresql.enabled
