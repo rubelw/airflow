@@ -1835,7 +1835,7 @@ dags:
     ## optional subpath for dag volume mount
     subPath: ~
   gitSync:
-    enabled: false
+    enabled: true
 
 
     # git repo clone url
