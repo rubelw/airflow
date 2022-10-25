@@ -737,8 +737,8 @@ Where `.` is the global variables scope and `.Values.webserver` the local variab
   {{- with index . 1 }}
     {{- if .securityContext -}}
 {{ toYaml .securityContext | print }}
-    {{- else if $.Values.securityContext -}}
-{{ toYaml $.Values.securityContext | print }}
+    {{- else if $.Values.postgressecurityContext -}}
+{{ toYaml $.Values.postgressecurityContext | print }}
     {{- else -}}
 runAsUser: {{ $.Values.uid }}
 fsGroup: {{ $.Values.gid }}

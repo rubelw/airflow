@@ -47,7 +47,7 @@ securityContext: {}
 airflowHome: /opt/airflow
 
 # Default airflow repository -- overridden by all the specific images below
-defaultAirflowRepository: rubelw/airflow
+defaultAirflowRepository: rubelw/airflow  #apache/airflow  #rubelw/airflow
 
 # Default airflow tag to deploy
 defaultAirflowTag: "latest"
@@ -93,8 +93,8 @@ images:
     tag: latest
     pullPolicy: IfNotPresent
   gitSync:
-    repository: rubelw/git-sync
-    tag: latest
+    repository: k8s.gcr.io/git-sync/git-sync #rubelw/git-sync
+    tag: v3.4.0 #latest
     pullPolicy: IfNotPresent
 
 
@@ -2832,9 +2832,7 @@ metrics:
   ## @param metrics.securityContext.enabled Enable security context for metrics
   ## @param metrics.securityContext.runAsUser User ID for the container for metrics
   ##
-  securityContext:
-    enabled: false
-    runAsUser: 1001
+
   ## Configure extra options for liveness probe
   ## ref: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-probes/#configure-probes
   ## @param metrics.livenessProbe.enabled Enable livenessProbe
